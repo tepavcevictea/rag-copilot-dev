@@ -23,6 +23,14 @@ function App() {
   const [sourceName, setSourceName] = useState("manual_note.md");
   const [sourceText, setSourceText] = useState("");
   const [ingestStatus, setIngestStatus] = useState("");
+  const [showIngest, setShowIngest] = useState(false);
+
+  const starterQuestions = [
+    "What is the refund request time window?",
+    "When is KYC required?",
+    "How fast must we escalate a P1 incident?",
+    "What is the default attribution window?",
+  ];
 
   const onAsk = async (event: FormEvent) => {
     event.preventDefault();
@@ -65,38 +73,30 @@ function App() {
       <header className="app-header">
         <h1>RAG Copilot</h1>
         <p>
-          Grounded internal knowledge assistant with citations and retrieval
-          transparency.
+          Ask policy, runbook, support, and product questions. Every answer is
+          grounded with citations.
         </p>
       </header>
 
       <section className="panel">
-        <h2>Quick Ingest</h2>
-        <form className="stack" onSubmit={onIngest}>
-          <label>
-            Source name
-            <input
-              value={sourceName}
-              onChange={(event) => setSourceName(event.target.value)}
-              placeholder="policy_note.md"
-            />
-          </label>
-          <label>
-            Source text
-            <textarea
-              value={sourceText}
-              onChange={(event) => setSourceText(event.target.value)}
-              rows={5}
-              placeholder="Paste document text to index into Chroma."
-            />
-          </label>
-          <button type="submit">Ingest Text</button>
-        </form>
-        {ingestStatus ? <p className="status">{ingestStatus}</p> : null}
-      </section>
-
-      <section className="panel">
-        <h2>Ask</h2>
+        <h2>Ask a Question</h2>
+        <p className="muted">
+          Type a business question, then click <strong>Ask Question</strong>.
+          The assistant will answer from indexed internal documents and show
+          citations.
+        </p>
+        <div className="chips">
+          {starterQuestions.map((starter) => (
+            <button
+              key={starter}
+              type="button"
+              className="chip"
+              onClick={() => setQuestion(starter)}
+            >
+              {starter}
+            </button>
+          ))}
+        </div>
         <form className="stack" onSubmit={onAsk}>
           <label>
             Question
@@ -104,32 +104,37 @@ function App() {
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               rows={3}
-              placeholder="Ask about policy, runbook, support, or product behavior."
-            />
-          </label>
-          <label>
-            Top K
-            <input
-              type="number"
-              min={1}
-              max={15}
-              value={topK}
-              onChange={(event) => setTopK(Number(event.target.value))}
+              placeholder="Example: Can we refund a dispute after 45 days if fraud review is active?"
             />
           </label>
           <div className="row">
             <button type="submit" disabled={loading}>
               {loading ? "Asking..." : "Ask Question"}
             </button>
-            <label className="inline">
-              <input
-                type="checkbox"
-                checked={showChunks}
-                onChange={(event) => setShowChunks(event.target.checked)}
-              />
-              Show retrieved chunks
-            </label>
           </div>
+          <details className="advanced">
+            <summary>Advanced options</summary>
+            <div className="advanced-grid">
+              <label>
+                Retrieval depth (Top K)
+                <input
+                  type="number"
+                  min={1}
+                  max={15}
+                  value={topK}
+                  onChange={(event) => setTopK(Number(event.target.value))}
+                />
+              </label>
+              <label className="inline">
+                <input
+                  type="checkbox"
+                  checked={showChunks}
+                  onChange={(event) => setShowChunks(event.target.checked)}
+                />
+                Show retrieved chunks for debugging
+              </label>
+            </div>
+          </details>
         </form>
         {error ? <p className="error">{error}</p> : null}
       </section>
@@ -175,6 +180,46 @@ function App() {
             </article>
           ))
         )}
+      </section>
+
+      <section className="panel">
+        <div className="row between">
+          <h2>Document Import (Admin)</h2>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setShowIngest((prev) => !prev)}
+          >
+            {showIngest ? "Hide" : "Show"}
+          </button>
+        </div>
+        <p className="muted">
+          Use this only when you want to add a new text document into the
+          knowledge base.
+        </p>
+        {showIngest ? (
+          <form className="stack" onSubmit={onIngest}>
+            <label>
+              Document name
+              <input
+                value={sourceName}
+                onChange={(event) => setSourceName(event.target.value)}
+                placeholder="policy_new_rule.md"
+              />
+            </label>
+            <label>
+              Document content
+              <textarea
+                value={sourceText}
+                onChange={(event) => setSourceText(event.target.value)}
+                rows={6}
+                placeholder="Paste the document text you want indexed."
+              />
+            </label>
+            <button type="submit">Import Document</button>
+          </form>
+        ) : null}
+        {ingestStatus ? <p className="status">{ingestStatus}</p> : null}
       </section>
     </main>
   );

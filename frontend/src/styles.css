@@ -29,6 +29,21 @@ body {
   color: #334155;
 }
 
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.chip {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -81,10 +96,31 @@ button:disabled {
   gap: 14px;
 }
 
+.between {
+  justify-content: space-between;
+}
+
 .inline {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.advanced {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.advanced-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .status {
@@ -118,4 +154,10 @@ button:disabled {
 .chunk-text {
   color: #334155;
   white-space: pre-wrap;
+}
+
+.ghost {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
 }
