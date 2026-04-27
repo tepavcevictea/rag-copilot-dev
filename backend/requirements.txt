@@ -3,3 +3,5 @@ uvicorn
 pydantic-settings
 openai
 chromadb
+python-jose[cryptography]
+passlib[bcrypt]

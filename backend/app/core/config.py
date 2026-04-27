@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     chunk_max_chars: int = 900
     chunk_overlap_chars: int = 120
     retrieval_max_distance: float = 1.35
+    jwt_secret_key: str = "change_me_for_prod"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 180
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -1,10 +1,13 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import {
   AskResponse,
+  MeResponse,
   RetrievedChunk,
+  getMe,
   askQuestion,
   ingestText,
+  login,
 } from "./api/client";
 
 type ChatTurn = {
@@ -13,8 +16,18 @@ type ChatTurn = {
 };
 
 function App() {
+  const [token, setToken] = useState<string>(
+    () => localStorage.getItem("rag_token") ?? "",
+  );
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [loginUsername, setLoginUsername] = useState("employee_demo");
+  const [loginPassword, setLoginPassword] = useState("employee123");
+
   const [question, setQuestion] = useState("");
   const [topK, setTopK] = useState(8);
+  const [mode, setMode] = useState<"rag" | "agent">("agent");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showChunks, setShowChunks] = useState(false);
@@ -32,6 +45,48 @@ function App() {
     "What is the default attribution window?",
   ];
 
+  const hydrateMe = async (jwt: string) => {
+    try {
+      const profile = await getMe(jwt);
+      setMe(profile);
+    } catch {
+      localStorage.removeItem("rag_token");
+      setToken("");
+      setMe(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!token || me) {
+      return;
+    }
+    setAuthLoading(true);
+    hydrateMe(token).finally(() => setAuthLoading(false));
+  }, [token, me]);
+
+  const onLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      const response = await login(loginUsername, loginPassword);
+      setToken(response.access_token);
+      localStorage.setItem("rag_token", response.access_token);
+      await hydrateMe(response.access_token);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Login failed.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const onLogout = () => {
+    localStorage.removeItem("rag_token");
+    setToken("");
+    setMe(null);
+    setHistory([]);
+  };
+
   const onAsk = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = question.trim();
@@ -41,7 +96,10 @@ function App() {
     setLoading(true);
     setError("");
     try {
-      const response = await askQuestion(trimmed, topK);
+      if (!token) {
+        throw new Error("Login required.");
+      }
+      const response = await askQuestion(token, trimmed, topK, mode);
       setHistory((prev) => [{ question: trimmed, response }, ...prev]);
       setQuestion("");
     } catch (err) {
@@ -59,7 +117,14 @@ function App() {
     }
     setIngestStatus("Ingesting...");
     try {
-      const response = await ingestText(sourceName.trim(), sourceText.trim());
+      if (!token) {
+        throw new Error("Login required.");
+      }
+      const response = await ingestText(
+        token,
+        sourceName.trim(),
+        sourceText.trim(),
+      );
       setIngestStatus(
         `Indexed ${response.chunks_indexed} chunk(s) from ${response.source}.`,
       );
@@ -67,6 +132,41 @@ function App() {
       setIngestStatus(err instanceof Error ? err.message : "Ingest failed.");
     }
   };
+
+  if (!token || !me) {
+    return (
+      <main className="app-shell">
+        <section className="panel">
+          <h1>RAG Copilot Login</h1>
+          <p className="muted">
+            Use demo accounts: <code>employee_demo / employee123</code> or{" "}
+            <code>admin_demo / admin123</code>.
+          </p>
+          <form className="stack" onSubmit={onLogin}>
+            <label>
+              Username
+              <input
+                value={loginUsername}
+                onChange={(event) => setLoginUsername(event.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={authLoading}>
+              {authLoading ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
+          {authError ? <p className="error">{authError}</p> : null}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -76,6 +176,14 @@ function App() {
           Ask policy, runbook, support, and product questions. Every answer is
           grounded with citations.
         </p>
+        <div className="row between">
+          <p className="muted">
+            Signed in as <strong>{me.username}</strong> ({me.role})
+          </p>
+          <button type="button" className="ghost" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
       </header>
 
       <section className="panel">
@@ -111,6 +219,16 @@ function App() {
             <button type="submit" disabled={loading}>
               {loading ? "Asking..." : "Ask Question"}
             </button>
+            <label>
+              Mode
+              <select
+                value={mode}
+                onChange={(event) => setMode(event.target.value as "rag" | "agent")}
+              >
+                <option value="agent">Agent</option>
+                <option value="rag">RAG</option>
+              </select>
+            </label>
           </div>
           <details className="advanced">
             <summary>Advanced options</summary>
@@ -182,7 +300,8 @@ function App() {
         )}
       </section>
 
-      <section className="panel">
+      {me.role === "admin" ? (
+        <section className="panel">
         <div className="row between">
           <h2>Document Import (Admin)</h2>
           <button
@@ -221,6 +340,7 @@ function App() {
         ) : null}
         {ingestStatus ? <p className="status">{ingestStatus}</p> : null}
       </section>
+      ) : null}
     </main>
   );
 }
