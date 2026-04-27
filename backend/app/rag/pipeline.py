@@ -181,13 +181,32 @@ def _token_set(text: str) -> set[str]:
 
 def _rerank_chunks(question: str, retrieved: list[ChunkRecord]) -> list[ChunkRecord]:
     query_tokens = _token_set(question)
+    lowered_question = question.lower()
     scored: list[tuple[float, ChunkRecord]] = []
     for chunk in retrieved:
         chunk_tokens = _token_set(chunk["text"])
         overlap = len(query_tokens.intersection(chunk_tokens))
         lexical_score = overlap / max(len(query_tokens), 1)
         distance_score = max(0.0, 1.0 - (chunk["score"] / 2.0))
-        combined = (0.7 * lexical_score) + (0.3 * distance_score)
+
+        # Boost likely security/PII sources for policy-risk questions.
+        source = chunk["source"].lower()
+        section = chunk.get("section", "").lower()
+        pii_intent = any(
+            token in lowered_question
+            for token in ("pii", "email", "id data", "screenshot", "externally", "share")
+        )
+        security_boost = 0.0
+        if pii_intent and (
+            "pii" in source
+            or "security" in source
+            or "access_control" in source
+            or "pii" in section
+            or "security" in section
+        ):
+            security_boost = 0.25
+
+        combined = (0.65 * lexical_score) + (0.35 * distance_score) + security_boost
         scored.append((combined, chunk))
     scored.sort(key=lambda item: item[0], reverse=True)
     return [item[1] for item in scored]
@@ -198,9 +217,39 @@ def answer_question(question: str, top_k: int = 3) -> dict:
     if not allowed:
         return {"answer": policy_message, "citations": [], "retrieved_chunks": []}
 
+    lowered_question = question.lower()
+    pii_intent = any(
+        token in lowered_question
+        for token in (
+            "pii",
+            "email",
+            "id data",
+            "screenshot",
+            "externally",
+            "share",
+            "sensitive",
+        )
+    )
+
     query_embedding = embed_texts([question])[0]
     retrieval_k = max(top_k, settings.retrieval_top_k)
     retrieved = store.similarity_search(query_embedding=query_embedding, top_k=retrieval_k)
+
+    if pii_intent:
+        pii_scoped = [
+            chunk
+            for chunk in retrieved
+            if (
+                "policy_pii_handling" in chunk["source"].lower()
+                or "security_" in chunk["source"].lower()
+                or "access_control" in chunk["source"].lower()
+                or "pii" in chunk.get("section", "").lower()
+                or "security" in chunk.get("section", "").lower()
+            )
+        ]
+        if pii_scoped:
+            retrieved = pii_scoped
+
     retrieved = [
         chunk
         for chunk in retrieved
