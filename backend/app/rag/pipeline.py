@@ -25,6 +25,19 @@ DOMAIN_KEYWORDS = {
     "pii",
     "attribution",
     "conversion",
+    "escalate",
+    "escalation",
+    "acknowledge",
+    "ack",
+    "dispute",
+    "review",
+    "postmortem",
+    "delay",
+    "incident",
+    "security",
+    "support",
+    "compliance",
+    "policy",
 }
 
 OFF_TOPIC_KEYWORDS = {
@@ -128,12 +141,16 @@ def _enforce_question_policy(question: str) -> tuple[bool, str | None]:
     domain_hits = sum(1 for token in DOMAIN_KEYWORDS if token in lowered)
     off_topic_hits = sum(1 for token in OFF_TOPIC_KEYWORDS if token in lowered)
 
-    if domain_hits == 0 and off_topic_hits > 0:
+    # Only hard-block when question is clearly non-domain and explicitly off-topic.
+    if domain_hits == 0 and off_topic_hits >= 1:
         return (
             False,
             "I only answer questions related to the internal knowledge base domain.",
         )
-    if domain_hits == 0:
+
+    # For very short ambiguous prompts with zero domain signal, ask user to reframe.
+    token_count = len(_token_set(question))
+    if domain_hits == 0 and token_count <= 4:
         return (
             False,
             "This question appears out of scope. Ask about policies, runbooks, support, or product operations.",
