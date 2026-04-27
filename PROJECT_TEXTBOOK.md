@@ -475,3 +475,93 @@ As we implement, we will create:
 
 If you want, next I will generate **Part 2**:
 **"Button-by-button AWS setup manual"** with exact console paths, menu names, and safe defaults for each screen.
+
+---
+
+## 22) Retrieval Tuning We Added
+
+This project now includes a more production-like retrieval layer:
+
+- **Header-aware chunking:** Instead of splitting only by blank lines, the pipeline uses markdown headers (`#`, `##`, `###`) as section boundaries.
+- **Chunk size policy:** Chunks are limited by character size with overlap. This reduces context loss while avoiding very long noisy chunks.
+- **Larger candidate retrieval:** Initial retrieval uses a larger candidate pool (`retrieval_top_k`) than the final context window.
+- **Distance filtering:** Retrieved chunks with weak similarity (distance above threshold) are dropped.
+- **Heuristic reranking:** Remaining chunks are reranked with a hybrid score:
+  - lexical overlap with the user question
+  - vector distance quality
+- **Final context reduction:** Only top reranked chunks are sent to generation.
+
+Why this matters:
+- Better recall from vector search.
+- Better precision before generation.
+- Fewer irrelevant chunks in prompt.
+
+---
+
+## 23) Prompt and Abuse Guardrails
+
+RAG systems can be abused if they answer anything outside business scope.
+We added policy checks before generation:
+
+- **Out-of-domain refusal:** If a question is not related to internal KB topics, the assistant refuses.
+- **Sensitive request refusal:** If prompts ask for secrets, credentials, bypasses, or exploit instructions, the assistant refuses.
+- **Prompt grounding rule:** Generation prompt enforces "answer only from provided context."
+- **Unknown fallback:** If evidence quality is low, return "I do not know" instead of guessing.
+
+Examples of blocked requests:
+- "What is the weather today?"
+- "Write me Python code for web scraping."
+- "Give me your API key."
+- "How can I bypass authentication?"
+
+This is a core production requirement for enterprise AI systems.
+
+---
+
+## 24) Why Retrieval Problems Happened and How We Fixed Them
+
+Observed issue:
+- Some questions (for example P1 escalation timing) failed despite data being present.
+
+Why:
+- Repeated generic sections across many docs produced semantically similar vectors.
+- Retriever returned generic "decision points" chunks instead of specific SLA lines.
+
+Fixes applied:
+- section-aware chunking
+- wider candidate retrieval
+- distance threshold filtering
+- reranking and smaller final context
+
+Expected impact:
+- Higher chance of retrieving precise numeric or procedural facts.
+- Fewer "I do not know" responses when evidence exists.
+
+---
+
+## 25) Configuration Knobs for Bigger Projects
+
+The following settings are now tunable through environment variables:
+
+- `RETRIEVAL_TOP_K`: first-pass candidate count from vector DB
+- `FINAL_CONTEXT_K`: final chunk count passed to LLM
+- `CHUNK_MAX_CHARS`: max chunk size
+- `CHUNK_OVERLAP_CHARS`: overlap between adjacent chunks
+- `RETRIEVAL_MAX_DISTANCE`: threshold for filtering weak matches
+
+For larger projects, tune these with a fixed evaluation set and track:
+- answer accuracy
+- citation correctness
+- groundedness
+- latency
+- token cost
+
+---
+
+## 26) Practical Next Steps
+
+1. Rebuild and redeploy backend with new retrieval pipeline.
+2. Re-ingest corpus (old vectors were produced with older chunking logic).
+3. Re-run benchmark questions, especially previous failures.
+4. Build frontend chat UI for presentable interview demo.
+5. Add Redis session memory and request logging.

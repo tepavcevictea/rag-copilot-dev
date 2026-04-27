@@ -9,6 +9,7 @@ from app.core.config import settings
 class ChunkRecord(TypedDict):
     id: str
     source: str
+    section: str
     text: str
     score: float
 
@@ -24,7 +25,12 @@ class ChromaStore:
         ids = [chunk["id"] for chunk in chunks]
         documents = [chunk["text"] for chunk in chunks]
         metadatas = [
-            {"source": chunk["source"], "chunk_id": chunk["id"]} for chunk in chunks
+            {
+                "source": chunk["source"],
+                "chunk_id": chunk["id"],
+                "section": chunk.get("section", "general"),
+            }
+            for chunk in chunks
         ]
         self._collection.add(
             ids=ids,
@@ -49,10 +55,12 @@ class ChromaStore:
         for document, metadata, distance in zip(documents, metadatas, distances):
             chunk_id = str(metadata.get("chunk_id", ""))
             source = str(metadata.get("source", "unknown"))
+            section = str(metadata.get("section", "general"))
             retrieved.append(
                 {
                     "id": chunk_id,
                     "source": source,
+                    "section": section,
                     "text": document,
                     "score": float(distance),
                 }
