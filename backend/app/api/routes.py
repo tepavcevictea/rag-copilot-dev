@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from app.rag.pipeline import answer_question, ingest_document
@@ -39,11 +40,17 @@ def health() -> dict:
 
 @router.post("/ingest", response_model=IngestResponse)
 def ingest(request: IngestRequest) -> IngestResponse:
-    chunks_indexed = ingest_document(text=request.text, source=request.source)
+    try:
+        chunks_indexed = ingest_document(text=request.text, source=request.source)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return IngestResponse(source=request.source, chunks_indexed=chunks_indexed)
 
 
 @router.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
-    result = answer_question(question=request.question, top_k=request.top_k)
+    try:
+        result = answer_question(question=request.question, top_k=request.top_k)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return AskResponse(**result)

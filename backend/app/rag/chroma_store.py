@@ -1,32 +1,60 @@
 from typing import TypedDict
 
+import chromadb
+from chromadb.api.models.Collection import Collection
+
+from app.core.config import settings
+
 
 class ChunkRecord(TypedDict):
     id: str
     source: str
     text: str
+    score: float
 
 
-class InMemoryChromaStore:
-    """
-    Step-1 stand-in for Chroma.
-
-    We keep this interface intentionally small so we can swap in a real
-    Chroma client next without changing API route logic.
-    """
-
+class ChromaStore:
     def __init__(self) -> None:
-        self._chunks: list[ChunkRecord] = []
+        client = chromadb.PersistentClient(path=settings.chroma_path)
+        self._collection: Collection = client.get_or_create_collection(
+            name=settings.chroma_collection
+        )
 
-    def add_chunks(self, chunks: list[ChunkRecord]) -> None:
-        self._chunks.extend(chunks)
+    def add_chunks(self, chunks: list[dict], embeddings: list[list[float]]) -> None:
+        ids = [chunk["id"] for chunk in chunks]
+        documents = [chunk["text"] for chunk in chunks]
+        metadatas = [
+            {"source": chunk["source"], "chunk_id": chunk["id"]} for chunk in chunks
+        ]
+        self._collection.add(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas,
+            embeddings=embeddings,
+        )
 
-    def similarity_search(self, query: str, top_k: int = 3) -> list[ChunkRecord]:
-        query_terms = {term.strip().lower() for term in query.split() if term.strip()}
-        scored: list[tuple[int, ChunkRecord]] = []
-        for chunk in self._chunks:
-            text_terms = set(chunk["text"].lower().split())
-            score = len(query_terms.intersection(text_terms))
-            scored.append((score, chunk))
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return [record for score, record in scored[:top_k] if score > 0]
+    def similarity_search(
+        self, query_embedding: list[float], top_k: int = 3
+    ) -> list[ChunkRecord]:
+        results = self._collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+        documents = results.get("documents", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+
+        retrieved: list[ChunkRecord] = []
+        for document, metadata, distance in zip(documents, metadatas, distances):
+            chunk_id = str(metadata.get("chunk_id", ""))
+            source = str(metadata.get("source", "unknown"))
+            retrieved.append(
+                {
+                    "id": chunk_id,
+                    "source": source,
+                    "text": document,
+                    "score": float(distance),
+                }
+            )
+        return retrieved
