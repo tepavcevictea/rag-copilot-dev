@@ -104,7 +104,18 @@ def _plan_from_instruction(instruction: str, docs: list[tuple[str, str]]) -> Pol
     )
 
 
+def _is_no_change_intent(instruction: str) -> bool:
+    lowered = instruction.lower()
+    markers = ("keep ", "no change", "unchanged", "do not change")
+    return any(marker in lowered for marker in markers)
+
+
 def create_change_request(instruction: str, requested_by: str) -> PolicyChangeRequest:
+    if _is_no_change_intent(instruction):
+        raise RuntimeError(
+            "No-op change request: instruction indicates no content change."
+        )
+
     docs = _load_docs()
     plan = _plan_from_instruction(instruction=instruction, docs=docs)
     source_path = _kb_dir() / plan.source

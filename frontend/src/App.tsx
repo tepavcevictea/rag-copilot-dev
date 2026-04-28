@@ -304,9 +304,7 @@ function App() {
       <section className="panel">
         <h2>Ask a Question</h2>
         <p className="muted">
-          Type a business question, then click <strong>Ask Question</strong>.
-          The assistant will answer from indexed internal documents and show
-          citations.
+          Ask about policies, runbooks, support, and product operations.
         </p>
         <div className="chips">
           {starterQuestions.map((starter) => (
@@ -370,6 +368,49 @@ function App() {
           </details>
         </form>
         {error ? <p className="error">{error}</p> : null}
+      </section>
+
+      <section className="panel">
+        <h2>Chat History</h2>
+        {history.length === 0 ? (
+          <p className="muted">No queries yet.</p>
+        ) : (
+          history.map((turn, index) => (
+            <article key={index} className="turn">
+              <h3>Q: {turn.question}</h3>
+              <p>{turn.response.answer}</p>
+              <div>
+                <strong>Citations:</strong>
+                <ul>
+                  {turn.response.citations.map((citation) => (
+                    <li key={citation.chunk_id}>
+                      {citation.source} ({citation.chunk_id.slice(0, 8)}...)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {showChunks ? (
+                <div>
+                  <strong>Retrieved chunks:</strong>
+                  <ul>
+                    {turn.response.retrieved_chunks.map(
+                      (chunk: RetrievedChunk) => (
+                        <li key={chunk.id}>
+                          <p>
+                            <strong>{chunk.source}</strong> | section=
+                            {chunk.section ?? "general"} | score=
+                            {chunk.score.toFixed(3)}
+                          </p>
+                          <p className="chunk-text">{chunk.text}</p>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              ) : null}
+            </article>
+          ))
+        )}
       </section>
 
       <section className="panel">
@@ -480,49 +521,6 @@ function App() {
                 <p className="muted">
                   Pending admin action. Employees cannot approve or reject.
                 </p>
-              ) : null}
-            </article>
-          ))
-        )}
-      </section>
-
-      <section className="panel">
-        <h2>Chat History</h2>
-        {history.length === 0 ? (
-          <p className="muted">No queries yet.</p>
-        ) : (
-          history.map((turn, index) => (
-            <article key={index} className="turn">
-              <h3>Q: {turn.question}</h3>
-              <p>{turn.response.answer}</p>
-              <div>
-                <strong>Citations:</strong>
-                <ul>
-                  {turn.response.citations.map((citation) => (
-                    <li key={citation.chunk_id}>
-                      {citation.source} ({citation.chunk_id.slice(0, 8)}...)
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {showChunks ? (
-                <div>
-                  <strong>Retrieved chunks:</strong>
-                  <ul>
-                    {turn.response.retrieved_chunks.map(
-                      (chunk: RetrievedChunk) => (
-                        <li key={chunk.id}>
-                          <p>
-                            <strong>{chunk.source}</strong> | section=
-                            {chunk.section ?? "general"} | score=
-                            {chunk.score.toFixed(3)}
-                          </p>
-                          <p className="chunk-text">{chunk.text}</p>
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
               ) : null}
             </article>
           ))
