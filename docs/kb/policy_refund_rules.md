@@ -2,7 +2,7 @@
 **Purpose:** Define when advertisers can receive credits or refunds.  
 **Scope:** Self-serve and managed campaigns in EU/US regions.  
 **Rules:**  
-- Requests must be submitted within **45 calendar days** of invoice date.  
+- Requests must be submitted within **50 calendar days** of invoice date.  
 - Only billing errors, duplicate charges, and confirmed delivery outages qualify.  
 - Performance dissatisfaction is not refundable unless SLA breach is proven.  
 - Approved refunds are processed as account credit first; bank refund only for account closure.  
