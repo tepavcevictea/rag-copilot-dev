@@ -152,6 +152,15 @@ button:disabled {
   margin: 6px 0;
 }
 
+.diff-block {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
 .chunk-text {
   color: #334155;
   white-space: pre-wrap;

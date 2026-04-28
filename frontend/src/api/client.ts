@@ -34,6 +34,19 @@ type IngestResponse = {
   chunks_indexed: number;
 };
 
+export type PolicyChange = {
+  id: string;
+  status: "proposed" | "applied" | "rejected";
+  requested_by: string;
+  approved_by: string | null;
+  instruction: string;
+  source: string;
+  rationale: string;
+  diff: string;
+  created_at: string;
+  approved_at: string | null;
+};
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   `${window.location.protocol}//${window.location.hostname}:8000`;
@@ -105,6 +118,66 @@ export async function ingestText(
   if (!response.ok) {
     const textError = await response.text();
     throw new Error(`Ingest failed: ${textError}`);
+  }
+  return response.json();
+}
+
+export async function createPolicyChangeRequest(
+  token: string,
+  instruction: string,
+): Promise<PolicyChange> {
+  const response = await fetch(`${API_BASE_URL}/policy/change-request`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ instruction }),
+  });
+  if (!response.ok) {
+    const textError = await response.text();
+    throw new Error(`Create change request failed: ${textError}`);
+  }
+  return response.json();
+}
+
+export async function approvePolicyChange(
+  token: string,
+  changeRequestId: string,
+): Promise<PolicyChange> {
+  const response = await fetch(`${API_BASE_URL}/policy/change-approve`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ change_request_id: changeRequestId }),
+  });
+  if (!response.ok) {
+    const textError = await response.text();
+    throw new Error(`Approve failed: ${textError}`);
+  }
+  return response.json();
+}
+
+export async function rejectPolicyChange(
+  token: string,
+  changeRequestId: string,
+): Promise<PolicyChange> {
+  const response = await fetch(`${API_BASE_URL}/policy/change-reject`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ change_request_id: changeRequestId }),
+  });
+  if (!response.ok) {
+    const textError = await response.text();
+    throw new Error(`Reject failed: ${textError}`);
+  }
+  return response.json();
+}
+
+export async function listPolicyChanges(token: string): Promise<PolicyChange[]> {
+  const response = await fetch(`${API_BASE_URL}/policy/change-requests`, {
+    method: "GET",
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    const textError = await response.text();
+    throw new Error(`Load policy changes failed: ${textError}`);
   }
   return response.json();
 }

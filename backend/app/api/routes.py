@@ -3,7 +3,12 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from app.agent.orchestrator import agent_ask
-from app.agent.policy_editor import approve_change_request, create_change_request
+from app.agent.policy_editor import (
+    approve_change_request,
+    create_change_request,
+    list_change_requests,
+    reject_change_request,
+)
 from app.auth.security import (
     create_access_token,
     get_current_user,
@@ -78,6 +83,10 @@ class PolicyChangeRequestIn(BaseModel):
 
 
 class PolicyChangeApproveIn(BaseModel):
+    change_request_id: str
+
+
+class PolicyChangeRejectIn(BaseModel):
     change_request_id: str
 
 
@@ -172,3 +181,26 @@ def policy_change_approve(
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return PolicyChangeResponse(**result.model_dump())
+
+
+@router.post("/policy/change-reject", response_model=PolicyChangeResponse)
+def policy_change_reject(
+    request: PolicyChangeRejectIn, user=Depends(require_admin)
+) -> PolicyChangeResponse:
+    try:
+        result = reject_change_request(
+            change_request_id=request.change_request_id,
+            approved_by=user["sub"],
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PolicyChangeResponse(**result.model_dump())
+
+
+@router.get("/policy/change-requests", response_model=list[PolicyChangeResponse])
+def policy_change_requests(_user=Depends(require_employee_or_admin)) -> list[PolicyChangeResponse]:
+    try:
+        requests = list_change_requests()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return [PolicyChangeResponse(**item.model_dump()) for item in requests]

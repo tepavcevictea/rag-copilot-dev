@@ -11,6 +11,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.rag.pipeline import reindex_document
 
 ChangeStatus = Literal["proposed", "applied", "rejected"]
 
@@ -154,6 +155,15 @@ def get_change_request(change_request_id: str) -> PolicyChangeRequest:
     return PolicyChangeRequest(**payload)
 
 
+def list_change_requests() -> list[PolicyChangeRequest]:
+    requests: list[PolicyChangeRequest] = []
+    for request_path in sorted(_change_dir().glob("*.json")):
+        payload = json.loads(request_path.read_text(encoding="utf-8"))
+        requests.append(PolicyChangeRequest(**payload))
+    requests.sort(key=lambda item: item.created_at, reverse=True)
+    return requests
+
+
 def approve_change_request(change_request_id: str, approved_by: str) -> PolicyChangeRequest:
     request = get_change_request(change_request_id=change_request_id)
     if request.status != "proposed":
@@ -174,8 +184,22 @@ def approve_change_request(change_request_id: str, approved_by: str) -> PolicyCh
         1,
     )
     source_path.write_text(updated_text, encoding="utf-8")
+    reindex_document(text=updated_text, source=request.source)
 
     request.status = "applied"
+    request.approved_by = approved_by
+    request.approved_at = datetime.now(timezone.utc).isoformat()
+    request_path = _change_dir() / f"{request.id}.json"
+    request_path.write_text(request.model_dump_json(indent=2), encoding="utf-8")
+    return request
+
+
+def reject_change_request(change_request_id: str, approved_by: str) -> PolicyChangeRequest:
+    request = get_change_request(change_request_id=change_request_id)
+    if request.status != "proposed":
+        raise RuntimeError("Only proposed change requests can be rejected.")
+
+    request.status = "rejected"
     request.approved_by = approved_by
     request.approved_at = datetime.now(timezone.utc).isoformat()
     request_path = _change_dir() / f"{request.id}.json"

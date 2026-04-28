@@ -174,6 +174,12 @@ def ingest_document(text: str, source: str) -> int:
     return len(chunks)
 
 
+def reindex_document(text: str, source: str) -> int:
+    # Replace stale chunks to avoid duplicate results after policy updates.
+    store.delete_by_source(source=source)
+    return ingest_document(text=text, source=source)
+
+
 def _token_set(text: str) -> set[str]:
     cleaned = "".join(ch if ch.isalnum() else " " for ch in text.lower())
     return {token for token in cleaned.split() if len(token) > 2}

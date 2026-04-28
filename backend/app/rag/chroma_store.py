@@ -39,6 +39,9 @@ class ChromaStore:
             embeddings=embeddings,
         )
 
+    def delete_by_source(self, source: str) -> None:
+        self._collection.delete(where={"source": source})
+
     def similarity_search(
         self, query_embedding: list[float], top_k: int = 3
     ) -> list[ChunkRecord]:

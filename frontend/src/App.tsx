@@ -3,11 +3,16 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   AskResponse,
   MeResponse,
+  PolicyChange,
   RetrievedChunk,
+  approvePolicyChange,
   getMe,
   askQuestion,
+  createPolicyChangeRequest,
   ingestText,
+  listPolicyChanges,
   login,
+  rejectPolicyChange,
 } from "./api/client";
 
 type ChatTurn = {
@@ -37,6 +42,12 @@ function App() {
   const [sourceText, setSourceText] = useState("");
   const [ingestStatus, setIngestStatus] = useState("");
   const [showIngest, setShowIngest] = useState(false);
+  const [policyInstruction, setPolicyInstruction] = useState("");
+  const [policyStatus, setPolicyStatus] = useState("");
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyChanges, setPolicyChanges] = useState<PolicyChange[]>([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueStatus, setQueueStatus] = useState("");
 
   const starterQuestions = [
     "What is the refund request time window?",
@@ -87,6 +98,31 @@ function App() {
     setHistory([]);
   };
 
+  const refreshPolicyQueue = async () => {
+    if (!token) {
+      return;
+    }
+    setQueueLoading(true);
+    try {
+      const changes = await listPolicyChanges(token);
+      setPolicyChanges(changes);
+      setQueueStatus("");
+    } catch (err) {
+      setQueueStatus(
+        err instanceof Error ? err.message : "Failed to load policy changes.",
+      );
+    } finally {
+      setQueueLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    refreshPolicyQueue();
+  }, [token]);
+
   const onAsk = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = question.trim();
@@ -130,6 +166,68 @@ function App() {
       );
     } catch (err) {
       setIngestStatus(err instanceof Error ? err.message : "Ingest failed.");
+    }
+  };
+
+  const onPolicyRequest = async (event: FormEvent) => {
+    event.preventDefault();
+    const instruction = policyInstruction.trim();
+    if (!instruction) {
+      setPolicyStatus("Describe the policy change request.");
+      return;
+    }
+    setPolicyLoading(true);
+    setPolicyStatus("");
+    try {
+      if (!token) {
+        throw new Error("Login required.");
+      }
+      const request = await createPolicyChangeRequest(token, instruction);
+      setPolicyStatus(
+        `Created change request ${request.id.slice(0, 8)}... (${request.source}).`,
+      );
+      setPolicyInstruction("");
+      await refreshPolicyQueue();
+    } catch (err) {
+      setPolicyStatus(
+        err instanceof Error ? err.message : "Failed to create request.",
+      );
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const onApprove = async (changeRequestId: string) => {
+    setQueueLoading(true);
+    setQueueStatus("");
+    try {
+      if (!token) {
+        throw new Error("Login required.");
+      }
+      await approvePolicyChange(token, changeRequestId);
+      setQueueStatus(`Approved ${changeRequestId.slice(0, 8)}... and reindexed.`);
+      await refreshPolicyQueue();
+    } catch (err) {
+      setQueueStatus(err instanceof Error ? err.message : "Approve failed.");
+    } finally {
+      setQueueLoading(false);
+    }
+  };
+
+  const onReject = async (changeRequestId: string) => {
+    setQueueLoading(true);
+    setQueueStatus("");
+    try {
+      if (!token) {
+        throw new Error("Login required.");
+      }
+      await rejectPolicyChange(token, changeRequestId);
+      setQueueStatus(`Rejected ${changeRequestId.slice(0, 8)}...`);
+      await refreshPolicyQueue();
+    } catch (err) {
+      setQueueStatus(err instanceof Error ? err.message : "Reject failed.");
+    } finally {
+      setQueueLoading(false);
     }
   };
 
@@ -255,6 +353,82 @@ function App() {
           </details>
         </form>
         {error ? <p className="error">{error}</p> : null}
+      </section>
+
+      <section className="panel">
+        <h2>Policy Change Requests</h2>
+        <p className="muted">
+          Describe a policy update in plain language. The agent drafts a
+          request with an exact diff for admin review.
+        </p>
+        <form className="stack" onSubmit={onPolicyRequest}>
+          <label>
+            Change instruction
+            <textarea
+              value={policyInstruction}
+              onChange={(event) => setPolicyInstruction(event.target.value)}
+              rows={3}
+              placeholder="Change refund request window from 45 to 50 days and keep formal tone."
+            />
+          </label>
+          <div className="row">
+            <button type="submit" disabled={policyLoading}>
+              {policyLoading ? "Creating..." : "Create Change Request"}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={refreshPolicyQueue}
+              disabled={queueLoading}
+            >
+              Refresh Queue
+            </button>
+          </div>
+        </form>
+        {policyStatus ? <p className="status">{policyStatus}</p> : null}
+        {queueStatus ? <p className="status">{queueStatus}</p> : null}
+        {policyChanges.length === 0 ? (
+          <p className="muted">No change requests yet.</p>
+        ) : (
+          policyChanges.map((change) => (
+            <article key={change.id} className="turn">
+              <h3>
+                {change.source} ({change.status})
+              </h3>
+              <p className="muted">
+                Requested by {change.requested_by} at{" "}
+                {new Date(change.created_at).toLocaleString()}
+              </p>
+              <p>{change.instruction}</p>
+              <p>
+                <strong>Rationale:</strong> {change.rationale}
+              </p>
+              <details>
+                <summary>View diff</summary>
+                <pre className="diff-block">{change.diff}</pre>
+              </details>
+              {me.role === "admin" && change.status === "proposed" ? (
+                <div className="row">
+                  <button
+                    type="button"
+                    onClick={() => onApprove(change.id)}
+                    disabled={queueLoading}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => onReject(change.id)}
+                    disabled={queueLoading}
+                  >
+                    Reject
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))
+        )}
       </section>
 
       <section className="panel">
