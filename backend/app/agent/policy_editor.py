@@ -39,11 +39,11 @@ class PolicyChangeRequest(BaseModel):
 
 def _repo_root() -> Path:
     # app/agent/policy_editor.py -> backend/
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[2]
 
 
 def _kb_dir() -> Path:
-    return _repo_root().parent / "docs" / "kb"
+    return _repo_root() / "docs" / "kb"
 
 
 def _change_dir() -> Path:
