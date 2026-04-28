@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from app.agent.orchestrator import agent_ask
+from app.agent.policy_editor import approve_change_request, create_change_request
 from app.auth.security import (
     create_access_token,
     get_current_user,
@@ -69,6 +70,30 @@ class MeResponse(BaseModel):
     role: str
 
 
+class PolicyChangeRequestIn(BaseModel):
+    instruction: str = Field(
+        ...,
+        description="Natural language policy change request.",
+    )
+
+
+class PolicyChangeApproveIn(BaseModel):
+    change_request_id: str
+
+
+class PolicyChangeResponse(BaseModel):
+    id: str
+    status: str
+    requested_by: str
+    approved_by: str | None = None
+    instruction: str
+    source: str
+    rationale: str
+    diff: str
+    created_at: str
+    approved_at: str | None = None
+
+
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -119,3 +144,31 @@ def agent_endpoint(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return AgentAskResponse(**result)
+
+
+@router.post("/policy/change-request", response_model=PolicyChangeResponse)
+def policy_change_request(
+    request: PolicyChangeRequestIn, user=Depends(require_employee_or_admin)
+) -> PolicyChangeResponse:
+    try:
+        result = create_change_request(
+            instruction=request.instruction,
+            requested_by=user["sub"],
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PolicyChangeResponse(**result.model_dump())
+
+
+@router.post("/policy/change-approve", response_model=PolicyChangeResponse)
+def policy_change_approve(
+    request: PolicyChangeApproveIn, user=Depends(require_admin)
+) -> PolicyChangeResponse:
+    try:
+        result = approve_change_request(
+            change_request_id=request.change_request_id,
+            approved_by=user["sub"],
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PolicyChangeResponse(**result.model_dump())

@@ -3,6 +3,8 @@ uvicorn
 pydantic-settings
 openai
 chromadb
+langchain
+langchain-openai
 python-jose[cryptography]
 passlib==1.7.4
 # bcrypt 5.x breaks passlib 1.7.4 (AttributeError: __about__). Pin 4.x.
