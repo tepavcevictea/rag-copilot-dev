@@ -123,6 +123,10 @@ def create_change_request(instruction: str, requested_by: str) -> PolicyChangeRe
             "Proposed original_text is ambiguous (appears multiple times). "
             "Try a more specific instruction."
         )
+    if plan.original_text.strip() == plan.replacement_text.strip():
+        raise RuntimeError(
+            "No-op change request: proposed replacement matches existing text."
+        )
 
     diff = _build_diff(
         source=plan.source,

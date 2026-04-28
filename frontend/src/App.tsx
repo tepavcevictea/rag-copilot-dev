@@ -48,6 +48,9 @@ function App() {
   const [policyChanges, setPolicyChanges] = useState<PolicyChange[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueStatus, setQueueStatus] = useState("");
+  const [queueFilter, setQueueFilter] = useState<
+    "all" | "proposed" | "applied" | "rejected"
+  >("all");
 
   const starterQuestions = [
     "What is the refund request time window?",
@@ -231,6 +234,11 @@ function App() {
     }
   };
 
+  const visiblePolicyChanges =
+    queueFilter === "all"
+      ? policyChanges
+      : policyChanges.filter((change) => change.status === queueFilter);
+
   if (!token || !me) {
     return (
       <main className="app-shell">
@@ -276,13 +284,22 @@ function App() {
         </p>
         <div className="row between">
           <p className="muted">
-            Signed in as <strong>{me.username}</strong> ({me.role})
+            Signed in as <strong>{me.username}</strong>{" "}
+            <span className={`role-badge role-${me.role}`}>{me.role}</span>
           </p>
           <button type="button" className="ghost" onClick={onLogout}>
             Logout
           </button>
         </div>
       </header>
+
+      <section className="panel compact">
+        <h2>Access Overview</h2>
+        <p className="muted">
+          Employees can ask questions and submit policy change requests. Only
+          admins can approve/reject requests and import documents.
+        </p>
+      </section>
 
       <section className="panel">
         <h2>Ask a Question</h2>
@@ -359,7 +376,8 @@ function App() {
         <h2>Policy Change Requests</h2>
         <p className="muted">
           Describe a policy update in plain language. The agent drafts a
-          request with an exact diff for admin review.
+          request with an exact diff for admin review. You can target any file
+          in the knowledge base (`docs/kb/*.md`), not only refund policy.
         </p>
         <form className="stack" onSubmit={onPolicyRequest}>
           <label>
@@ -387,13 +405,46 @@ function App() {
         </form>
         {policyStatus ? <p className="status">{policyStatus}</p> : null}
         {queueStatus ? <p className="status">{queueStatus}</p> : null}
-        {policyChanges.length === 0 ? (
+        <div className="chips">
+          <button
+            type="button"
+            className={`chip ${queueFilter === "all" ? "chip-active" : ""}`}
+            onClick={() => setQueueFilter("all")}
+          >
+            All ({policyChanges.length})
+          </button>
+          <button
+            type="button"
+            className={`chip ${queueFilter === "proposed" ? "chip-active" : ""}`}
+            onClick={() => setQueueFilter("proposed")}
+          >
+            Proposed ({policyChanges.filter((item) => item.status === "proposed").length})
+          </button>
+          <button
+            type="button"
+            className={`chip ${queueFilter === "applied" ? "chip-active" : ""}`}
+            onClick={() => setQueueFilter("applied")}
+          >
+            Applied ({policyChanges.filter((item) => item.status === "applied").length})
+          </button>
+          <button
+            type="button"
+            className={`chip ${queueFilter === "rejected" ? "chip-active" : ""}`}
+            onClick={() => setQueueFilter("rejected")}
+          >
+            Rejected ({policyChanges.filter((item) => item.status === "rejected").length})
+          </button>
+        </div>
+        {visiblePolicyChanges.length === 0 ? (
           <p className="muted">No change requests yet.</p>
         ) : (
-          policyChanges.map((change) => (
+          visiblePolicyChanges.map((change) => (
             <article key={change.id} className="turn">
               <h3>
-                {change.source} ({change.status})
+                {change.source}{" "}
+                <span className={`status-pill status-${change.status}`}>
+                  {change.status}
+                </span>
               </h3>
               <p className="muted">
                 Requested by {change.requested_by} at{" "}
@@ -425,6 +476,10 @@ function App() {
                     Reject
                   </button>
                 </div>
+              ) : me.role !== "admin" && change.status === "proposed" ? (
+                <p className="muted">
+                  Pending admin action. Employees cannot approve or reject.
+                </p>
               ) : null}
             </article>
           ))

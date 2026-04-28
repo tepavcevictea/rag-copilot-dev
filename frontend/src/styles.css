@@ -44,6 +44,11 @@ body {
   font-size: 13px;
 }
 
+.chip-active {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
 .panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -53,6 +58,11 @@ body {
 
 .panel h2 {
   margin-top: 0;
+}
+
+.panel.compact {
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 .stack {
@@ -129,6 +139,24 @@ button:disabled {
   margin-bottom: 0;
 }
 
+.role-badge {
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.role-admin {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.role-employee {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 .error {
   color: #b91c1c;
 }
@@ -146,6 +174,9 @@ button:disabled {
 
 .turn h3 {
   margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .turn p {
@@ -170,4 +201,26 @@ button:disabled {
   background: #f1f5f9;
   color: #0f172a;
   border: 1px solid #cbd5e1;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.status-proposed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-applied {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
 }
